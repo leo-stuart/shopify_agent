@@ -23,12 +23,22 @@ logger = logging.getLogger(__name__)
 # Import agent conditionally - use when available, fallback when not
 try:
     from agent.agent import root_agent
+    from google.adk.agents.invocation_context import InvocationContext
+    from google.adk.sessions import InMemorySessionService, Session
+
     agent_available = True
     logger.info("✅ Behold agent loaded successfully")
+
+    # Initialize session service
+    APP_NAME = "behold_whatsapp_agent"
+    session_service = InMemorySessionService()
+    logger.info("✅ ADK Session service initialized")
+
 except ImportError as e:
     logger.warning(f"⚠️ Failed to import root_agent: {e}")
     root_agent = None
     agent_available = False
+    session_service = None
 
 
 @asynccontextmanager
@@ -57,66 +67,6 @@ def create_application() -> FastAPI:
         """Health check endpoint."""
         return {"status": "healthy", "service": "Behold WhatsApp Shopify Agent"}
     
-    @app.get("/debug/app")
-    async def debug_app():
-        """Debug application status."""
-        return {
-            "app_status": "running",
-            "agent_available": agent_available,
-            "agent_loaded": root_agent is not None,
-            "environment_vars": {
-                "SHOPIFY_STORE": bool(os.getenv("SHOPIFY_STORE")),
-                "SHOPIFY_ADMIN_TOKEN": bool(os.getenv("SHOPIFY_ADMIN_TOKEN")),
-                "SHOPIFY_STOREFRONT_TOKEN": bool(os.getenv("SHOPIFY_STOREFRONT_TOKEN")),
-                "WHATSAPP_BRIDGE_URL": bool(os.getenv("WHATSAPP_BRIDGE_URL")),
-                "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY"))
-            },
-            "adk_agent_mode": "enabled" if agent_available else "fallback_mode"
-        }
-    
-    @app.get("/debug/bridge")
-    async def debug_bridge():
-        """Debug WhatsApp bridge connection."""
-        import requests
-        
-        bridge_url = os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001")
-        
-        try:
-            # Direct HTTP request to bridge
-            response = requests.get(f"{bridge_url}/health", timeout=10)
-            
-            if response.status_code == 200:
-                bridge_data = response.json()
-                return {
-                    "bridge_status": "connected",
-                    "bridge_url": bridge_url,
-                    "bridge_response": bridge_data,
-                    "agent_import": "not_used"
-                }
-            else:
-                return {
-                    "bridge_status": "error",
-                    "bridge_url": bridge_url,
-                    "error": f"Bridge returned status {response.status_code}",
-                    "response_text": response.text,
-                    "agent_import": "not_used"
-                }
-                
-        except requests.exceptions.ConnectionError:
-            return {
-                "bridge_status": "disconnected",
-                "bridge_url": bridge_url,
-                "error": f"Cannot connect to WhatsApp bridge at {bridge_url}. Is the bridge server running?",
-                "agent_import": "not_used"
-            }
-        except Exception as e:
-            return {
-                "bridge_status": "error",
-                "bridge_url": bridge_url,
-                "error": f"Failed to check bridge: {str(e)}",
-                "agent_import": "not_used"
-            }
-    
     @app.post("/process-whatsapp-message")
     async def process_whatsapp_message(request: Request):
         """Process WhatsApp message through the Behold agent."""
@@ -125,17 +75,40 @@ def create_application() -> FastAPI:
             user_id = data.get("user_id")
             message = data.get("message")
             message_id = data.get("message_id")
-            
+
             if not user_id or not message:
                 raise HTTPException(status_code=400, detail="Missing user_id or message")
-            
+
             logger.info(f"Processing message from {user_id}: {message}")
-            
-            # Use the ADK agent properly
-            if agent_available and root_agent:
+
+            # Use the ADK agent directly
+            if agent_available and root_agent and session_service:
                 try:
-                    # ADK agents use run method which returns the response directly
-                    response_text = root_agent.run(message)
+                    # Get or create session for this user
+                    session_id = f"whatsapp_{user_id}"
+
+                    # Create or get existing session
+                    session = await session_service.create_session(
+                        app_name=APP_NAME,
+                        user_id=user_id,
+                        session_id=session_id
+                    )
+
+                    # Create invocation context
+                    ctx = InvocationContext(
+                        session=session,
+                        user_content=message
+                    )
+
+                    # Run agent asynchronously
+                    response_text = ""
+                    async for event in root_agent.run_async(ctx):
+                        if event.is_final_response():
+                            response_text = event.content.parts[0].text
+                            break
+
+                    if not response_text:
+                        response_text = "Hello! I'm Behold, your Shopify assistant. How can I help you today?"
 
                     logger.info(f"Agent response: {response_text}")
 
@@ -146,44 +119,11 @@ def create_application() -> FastAPI:
                 logger.error("Agent not available")
                 raise HTTPException(status_code=500, detail="Agent not available")
 
-            return {"reply": str(response_text)}
-            
+            return {"reply": response_text}
+
         except Exception as e:
             logger.error(f"Error processing WhatsApp message: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
-
-    
-    @app.post("/test-message")
-    async def test_message():
-        """Simple test endpoint for WhatsApp bridge to call."""
-        return {"reply": "Test message received successfully!"}
-    
-    @app.post("/test-agent")
-    async def test_agent():
-        """Test the ADK agent with a simple message."""
-        if not agent_available or not root_agent:
-            return {"error": "Agent not available", "agent_available": agent_available}
-        
-        try:
-            # Test with a simple product search request
-            test_input = "User message: What products do you have?"
-            
-            # Use direct agent invocation
-            response = root_agent.run(test_input)
-            response_text = str(response) if response else "Test response"
-            
-            return {
-                "success": True,
-                "agent_response": response_text,
-                "agent_available": agent_available,
-                "test_input": test_input
-            }
-            
-        except Exception as e:
-            return {
-                "error": f"Agent test failed: {str(e)}",
-                "agent_available": agent_available
-            }
     
     return app
 
