@@ -272,7 +272,7 @@ def main():
 
     # Get configuration
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8080"))  # Railway uses 8080 by default
     debug = os.getenv("DEBUG", "false").lower() == "true"
 
     logger.info(f"Starting server on {host}:{port}")
