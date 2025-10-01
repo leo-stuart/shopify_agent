@@ -12,6 +12,14 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
 
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+
 # Import agent conditionally - use when available, fallback when not
 try:
     from agent.agent import root_agent
@@ -21,14 +29,6 @@ except ImportError as e:
     logger.warning(f"⚠️ Failed to import root_agent: {e}")
     root_agent = None
     agent_available = False
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
