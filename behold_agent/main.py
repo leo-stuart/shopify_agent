@@ -92,10 +92,17 @@ def create_application() -> FastAPI:
             logger.info(f"Processing message from {user_id}: {message}")
 
             # Use the ADK agent via Runner
-            if agent_available and runner:
+            if agent_available and runner and session_service:
                 try:
                     # Get or create session for this user
                     session_id = f"whatsapp_{user_id}"
+
+                    # Create session if it doesn't exist (await is required in ADK 1.0.0+)
+                    await session_service.create_session(
+                        app_name=APP_NAME,
+                        user_id=user_id,
+                        session_id=session_id
+                    )
 
                     # Create user message content
                     user_message = Content(role="user", parts=[Part.from_text(text=message)])
