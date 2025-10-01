@@ -20,6 +20,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Reduce verbosity of ADK model registry logs
+logging.getLogger('google_adk.google.adk.models.registry').setLevel(logging.WARNING)
+
 # Import agent conditionally - use when available, fallback when not
 try:
     from agent.agent import root_agent
@@ -95,7 +98,7 @@ def create_application() -> FastAPI:
                     session_id = f"whatsapp_{user_id}"
 
                     # Create user message content
-                    user_message = Content(role="user", parts=[Part.from_text(message)])
+                    user_message = Content(role="user", parts=[Part.from_text(text=message)])
 
                     # Run agent asynchronously via Runner
                     response_text = ""
