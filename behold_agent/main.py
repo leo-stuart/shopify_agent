@@ -49,6 +49,16 @@ def create_application() -> FastAPI:
         """Health check endpoint."""
         return {"status": "healthy", "service": "Behold WhatsApp Shopify Agent"}
     
+    @app.get("/debug/bridge")
+    async def debug_bridge():
+        """Debug WhatsApp bridge connection."""
+        from agent.tools.whatsapp.whatsapp_tool import check_whatsapp_status
+        bridge_status = check_whatsapp_status()
+        return {
+            "bridge_status": bridge_status,
+            "bridge_url": os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001")
+        }
+    
     @app.post("/process-whatsapp-message")
     async def process_whatsapp_message(request: Request):
         """Process WhatsApp message through the Behold agent."""
