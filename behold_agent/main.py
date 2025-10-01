@@ -12,7 +12,12 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
 
-from agent.agent import root_agent
+# Import agent conditionally to avoid startup failures
+try:
+    from agent.agent import root_agent
+except ImportError as e:
+    logger.warning(f"Failed to import root_agent: {e}")
+    root_agent = None
 
 # Configure logging
 logging.basicConfig(
@@ -49,15 +54,45 @@ def create_application() -> FastAPI:
         """Health check endpoint."""
         return {"status": "healthy", "service": "Behold WhatsApp Shopify Agent"}
     
+    @app.get("/debug/app")
+    async def debug_app():
+        """Debug application status."""
+        return {
+            "app_status": "running",
+            "agent_available": root_agent is not None,
+            "environment_vars": {
+                "SHOPIFY_STORE": bool(os.getenv("SHOPIFY_STORE")),
+                "SHOPIFY_ADMIN_TOKEN": bool(os.getenv("SHOPIFY_ADMIN_TOKEN")),
+                "SHOPIFY_STOREFRONT_TOKEN": bool(os.getenv("SHOPIFY_STOREFRONT_TOKEN")),
+                "WHATSAPP_BRIDGE_URL": bool(os.getenv("WHATSAPP_BRIDGE_URL")),
+                "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY"))
+            }
+        }
+    
     @app.get("/debug/bridge")
     async def debug_bridge():
         """Debug WhatsApp bridge connection."""
-        from agent.tools.whatsapp.whatsapp_tool import check_whatsapp_status
-        bridge_status = check_whatsapp_status()
-        return {
-            "bridge_status": bridge_status,
-            "bridge_url": os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001")
-        }
+        try:
+            from agent.tools.whatsapp.whatsapp_tool import check_whatsapp_status
+            bridge_status = check_whatsapp_status()
+            return {
+                "bridge_status": bridge_status,
+                "bridge_url": os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001"),
+                "agent_import": "success"
+            }
+        except ImportError as e:
+            return {
+                "bridge_status": {"error": "Failed to import WhatsApp tools"},
+                "bridge_url": os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001"),
+                "agent_import": "failed",
+                "import_error": str(e)
+            }
+        except Exception as e:
+            return {
+                "bridge_status": {"error": f"Bridge check failed: {str(e)}"},
+                "bridge_url": os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001"),
+                "agent_import": "success"
+            }
     
     @app.post("/process-whatsapp-message")
     async def process_whatsapp_message(request: Request):
@@ -94,20 +129,19 @@ app.router.lifespan_context = lifespan
 
 def main():
     """Main entry point."""
-    # Check required environment variables
-    required_vars = [
+    # Log environment variable status but don't fail startup
+    env_vars = [
         "SHOPIFY_STORE",
-        "SHOPIFY_ADMIN_TOKEN",
+        "SHOPIFY_ADMIN_TOKEN", 
         "SHOPIFY_STOREFRONT_TOKEN",
-        "WHATSAPP_BRIDGE_URL"
+        "WHATSAPP_BRIDGE_URL",
+        "GOOGLE_API_KEY"
     ]
-
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-
+    
+    missing_vars = [var for var in env_vars if not os.getenv(var)]
     if missing_vars:
-        logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
-        logger.error("Please check your .env file")
-        return
+        logger.warning(f"Missing environment variables: {', '.join(missing_vars)}")
+        logger.warning("Some features may not work without these variables")
 
     # Get configuration
     host = os.getenv("HOST", "0.0.0.0")
