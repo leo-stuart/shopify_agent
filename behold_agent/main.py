@@ -131,26 +131,22 @@ def create_application() -> FastAPI:
             
             logger.info(f"Processing message from {user_id}: {message}")
             
-            # Use the ADK agent properly - let it decide internally which tools to use
+            # Use the ADK agent properly
             if agent_available and root_agent:
                 try:
-                    # Use the agent directly - ADK agents have a simpler interface
-                    user_input = f"User message: {message}"
-                    
-                    # ADK agents use invoke method
-                    response = root_agent.invoke(user_input)
-                    response_text = str(response) if response else "Hello! I'm Behold, your Shopify assistant. How can I help you today?"
-                    
+                    # ADK agents use run method which returns the response directly
+                    response_text = root_agent.run(message)
+
                     logger.info(f"Agent response: {response_text}")
-                    
+
                 except Exception as agent_error:
                     logger.error(f"Agent processing failed: {agent_error}")
                     raise HTTPException(status_code=500, detail=f"Agent execution failed: {agent_error}")
             else:
                 logger.error("Agent not available")
                 raise HTTPException(status_code=500, detail="Agent not available")
-            
-            return {"reply": response_text}
+
+            return {"reply": str(response_text)}
             
         except Exception as e:
             logger.error(f"Error processing WhatsApp message: {e}")
