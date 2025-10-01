@@ -137,19 +137,18 @@ def create_application() -> FastAPI:
                     # Use the agent directly - ADK agents have a simpler interface
                     user_input = f"User message: {message}"
                     
-                    # Try direct agent invocation
-                    response = root_agent.run(user_input)
+                    # ADK agents use invoke method
+                    response = root_agent.invoke(user_input)
                     response_text = str(response) if response else "Hello! I'm Behold, your Shopify assistant. How can I help you today?"
                     
                     logger.info(f"Agent response: {response_text}")
                     
                 except Exception as agent_error:
-                    logger.warning(f"Agent processing failed: {agent_error}")
-                    # Fallback to direct Gemini
-                    response_text = await fallback_gemini_response(message)
+                    logger.error(f"Agent processing failed: {agent_error}")
+                    raise HTTPException(status_code=500, detail=f"Agent execution failed: {agent_error}")
             else:
-                logger.info("Using fallback Gemini response (agent not available)")
-                response_text = await fallback_gemini_response(message)
+                logger.error("Agent not available")
+                raise HTTPException(status_code=500, detail="Agent not available")
             
             return {"reply": response_text}
             
@@ -157,38 +156,6 @@ def create_application() -> FastAPI:
             logger.error(f"Error processing WhatsApp message: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    async def fallback_gemini_response(message: str) -> str:
-        """Fallback response using direct Gemini API."""
-        try:
-            import google.generativeai as genai
-            
-            # Configure Gemini
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise Exception("GOOGLE_API_KEY not found")
-                
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash')
-            
-            # Create prompt for Shopify assistant
-            prompt = f"""You are Behold, an intelligent Shopify sales assistant. You help customers by:
-- Providing product recommendations
-- Answering questions about products
-- Guiding purchasing decisions
-- Managing carts and checkouts
-- Calculating shipping fees
-
-User message: "{message}"
-
-Respond naturally and helpfully. Be concise but informative. If they're asking about products, offer to help them find what they need."""
-
-            # Get response from Gemini
-            response = model.generate_content(prompt)
-            return response.text if response.text else "Hello! I'm Behold, your Shopify assistant. How can I help you today?"
-            
-        except Exception as ai_error:
-            logger.warning(f"Fallback AI processing failed: {ai_error}")
-            return f"Thanks for your message! I'm your Shopify assistant. You said: '{message}'. How can I help you find products?"
     
     @app.post("/test-message")
     async def test_message():
