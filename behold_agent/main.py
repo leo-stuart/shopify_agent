@@ -134,25 +134,13 @@ def create_application() -> FastAPI:
             # Use the ADK agent properly - let it decide internally which tools to use
             if agent_available and root_agent:
                 try:
-                    import asyncio
-                    from google.adk.core import InvocationContext
-                    
-                    # Simple, clean input - let the agent decide what to do
+                    # Use the agent directly - ADK agents have a simpler interface
                     user_input = f"User message: {message}"
                     
-                    async def get_agent_response():
-                        ctx = InvocationContext()
-                        ctx.set_input(user_input)
-                        events = root_agent.run_async(ctx)
-                        
-                        # Collect the final response from the agent
-                        agent_reply = ""
-                        async for event in events:
-                            if hasattr(event, 'text') and event.text:
-                                agent_reply += event.text
-                        return agent_reply
-
-                    response_text = await get_agent_response()
+                    # Try direct agent invocation
+                    response = root_agent.run(user_input)
+                    response_text = str(response) if response else "Hello! I'm Behold, your Shopify assistant. How can I help you today?"
+                    
                     logger.info(f"Agent response: {response_text}")
                     
                 except Exception as agent_error:
@@ -214,24 +202,12 @@ Respond naturally and helpfully. Be concise but informative. If they're asking a
             return {"error": "Agent not available", "agent_available": agent_available}
         
         try:
-            import asyncio
-            from google.adk.core import InvocationContext
-            
             # Test with a simple product search request
             test_input = "User message: What products do you have?"
             
-            async def get_agent_response():
-                ctx = InvocationContext()
-                ctx.set_input(test_input)
-                events = root_agent.run_async(ctx)
-                
-                agent_reply = ""
-                async for event in events:
-                    if hasattr(event, 'text') and event.text:
-                        agent_reply += event.text
-                return agent_reply
-
-            response_text = await get_agent_response()
+            # Use direct agent invocation
+            response = root_agent.run(test_input)
+            response_text = str(response) if response else "Test response"
             
             return {
                 "success": True,
