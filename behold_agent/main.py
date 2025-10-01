@@ -23,22 +23,29 @@ logger = logging.getLogger(__name__)
 # Import agent conditionally - use when available, fallback when not
 try:
     from agent.agent import root_agent
-    from google.adk.agents.invocation_context import InvocationContext
-    from google.adk.sessions import InMemorySessionService, Session
+    from google.adk.runners import Runner
+    from google.adk.sessions import InMemorySessionService
+    from google.genai.types import Content, Part
 
     agent_available = True
     logger.info("✅ Behold agent loaded successfully")
 
-    # Initialize session service
+    # Initialize session service and runner
     APP_NAME = "behold_whatsapp_agent"
     session_service = InMemorySessionService()
-    logger.info("✅ ADK Session service initialized")
+    runner = Runner(
+        agent=root_agent,
+        app_name=APP_NAME,
+        session_service=session_service
+    )
+    logger.info("✅ ADK Runner initialized")
 
 except ImportError as e:
     logger.warning(f"⚠️ Failed to import root_agent: {e}")
     root_agent = None
     agent_available = False
     session_service = None
+    runner = None
 
 
 @asynccontextmanager
@@ -81,28 +88,22 @@ def create_application() -> FastAPI:
 
             logger.info(f"Processing message from {user_id}: {message}")
 
-            # Use the ADK agent directly
-            if agent_available and root_agent and session_service:
+            # Use the ADK agent via Runner
+            if agent_available and runner:
                 try:
                     # Get or create session for this user
                     session_id = f"whatsapp_{user_id}"
 
-                    # Create or get existing session
-                    session = await session_service.create_session(
-                        app_name=APP_NAME,
-                        user_id=user_id,
-                        session_id=session_id
-                    )
+                    # Create user message content
+                    user_message = Content(role="user", parts=[Part.from_text(message)])
 
-                    # Create invocation context
-                    ctx = InvocationContext(
-                        session=session,
-                        user_content=message
-                    )
-
-                    # Run agent asynchronously
+                    # Run agent asynchronously via Runner
                     response_text = ""
-                    async for event in root_agent.run_async(ctx):
+                    async for event in runner.run_async(
+                        user_id=user_id,
+                        session_id=session_id,
+                        new_message=user_message
+                    ):
                         if event.is_final_response():
                             response_text = event.content.parts[0].text
                             break
