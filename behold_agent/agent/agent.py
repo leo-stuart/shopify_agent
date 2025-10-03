@@ -16,7 +16,7 @@ from .tools import (
 
 
 root_agent = Agent(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     name="behold_agent",
     description=(
         "Intelligent Shopify sales assistant that proactively helps customers by automatically accessing store data "

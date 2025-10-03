@@ -42,6 +42,36 @@ try:
         session_service=session_service
     )
     logger.info("✅ ADK Runner initialized")
+    # Validate Shopify environment at startup
+    def validate_shopify_config():
+        """Validate Shopify configuration and test connectivity."""
+        required_vars = {
+            "SHOPIFY_STORE": os.getenv("SHOPIFY_STORE"),
+            "SHOPIFY_STOREFRONT_TOKEN": os.getenv("SHOPIFY_STOREFRONT_TOKEN"),
+            "SHOPIFY_ADMIN_TOKEN": os.getenv("SHOPIFY_ADMIN_TOKEN")
+        }
+
+        missing = [k for k, v in required_vars.items() if not v]
+
+        if missing:
+            return False
+
+        # Test a simple GraphQL query to verify connectivity
+        try:
+            from agent.tools.shopify_tool import get_store_info
+
+            result = get_store_info()
+
+            if result.get("status") == "success":
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            return False
+
+    # Run validation
+    shopify_configured = validate_shopify_config()
 
 except ImportError as e:
     logger.warning(f"⚠️ Failed to import root_agent: {e}")
@@ -49,6 +79,7 @@ except ImportError as e:
     agent_available = False
     session_service = None
     runner = None
+    shopify_configured = False
 
 
 @asynccontextmanager
