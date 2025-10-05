@@ -113,11 +113,14 @@ def create_application() -> FastAPI:
         """Process WhatsApp message through the Behold agent."""
         try:
             data = await request.json()
+            logger.info(f"Received WhatsApp data: {data}")
+
             user_id = data.get("user_id")
             message = data.get("message")
             message_id = data.get("message_id")
 
             if not user_id or not message:
+                logger.error(f"Invalid request format. Expected user_id and message, got: {list(data.keys())}")
                 raise HTTPException(status_code=400, detail="Missing user_id or message")
 
             logger.info(f"Processing message from {user_id}: {message}")
@@ -129,11 +132,16 @@ def create_application() -> FastAPI:
                     session_id = f"whatsapp_{user_id}"
 
                     # Create session if it doesn't exist (await is required in ADK 1.0.0+)
-                    await session_service.create_session(
-                        app_name=APP_NAME,
-                        user_id=user_id,
-                        session_id=session_id
-                    )
+                    try:
+                        await session_service.create_session(
+                            app_name=APP_NAME,
+                            user_id=user_id,
+                            session_id=session_id
+                        )
+                        logger.info(f"Created new session for user {user_id}")
+                    except Exception as session_error:
+                        # Session likely already exists, which is fine
+                        logger.debug(f"Session creation note for {user_id}: {session_error}")
 
                     # Create user message content
                     user_message = Content(role="user", parts=[Part.from_text(text=message)])
