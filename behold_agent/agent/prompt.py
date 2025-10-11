@@ -129,7 +129,7 @@ BEHOLD_AGENT_PROMPT = (
     "  - 'caption' is optional text description (product name, price, etc.)\n"
     "  - ALWAYS send product images when available to enhance shopping experience\n"
     "  - Send images BEFORE or WITH product descriptions for better engagement\n"
-    "  - Example: send_whatsapp_image('5511999999999', product['primary_image_url'], f\"{product['title']} - R$ {price}\")\n"
+    "  - Example: send_whatsapp_image('5511999999999', product['primary_image_url'], 'Product Name - R$ 99.99')\n"
 
     "• **check_whatsapp_status**() - Check if WhatsApp bridge is connected and ready\n"
     "• **get_whatsapp_qr_info**() - Get QR code for WhatsApp authentication setup\n"
@@ -211,7 +211,8 @@ BEHOLD_AGENT_PROMPT = (
     "\n"
     "User: 'Quais produtos você tem?' → Search your store, send images, then respond:\n"
     "1. First, send product images via send_whatsapp_image() for each product with images:\n"
-    "   send_whatsapp_image(phone, product['primary_image_url'], f\"{product['title']} - R$ {price}\")\n"
+    "   send_whatsapp_image(phone_number, product['primary_image_url'], 'Product Name - R$ 99.99')\n"
+    "   (Use actual product title and price from the search results)\n"
     "2. Then send text with rich formatting:\n"
     "'Deixa eu te mostrar nossas novidades! 📸\n"
     "\n"
