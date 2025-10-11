@@ -106,11 +106,13 @@ def send_whatsapp_image(to: str, image_url: str, caption: Optional[str] = None) 
     logger.info(f"Caption: {caption}")
 
     try:
+        # Send image URL directly to the bridge - let the bridge download it
         response = requests.post(
             f"{bridge_url}/send-image",
             json={
                 "to": to,
-                "imageUrl": image_url,
+                "image": image_url,
+                "imageType": "url",
                 "caption": caption
             },
             timeout=30
