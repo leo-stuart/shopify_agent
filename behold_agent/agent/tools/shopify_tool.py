@@ -633,25 +633,62 @@ def _format_operation_result(intent: str, data: Dict[str, Any], parameters: Dict
     Format GraphQL response data into user-friendly format based on operation intent.
     """
     intent_lower = intent.lower()
-    
+
     # Format product search results
     if "search" in intent_lower and "product" in intent_lower:
         # Handle both GraphQL format (edges) and direct array format
         if "edges" in data.get("products", {}):
             # Raw GraphQL format
             products = data.get("products", {}).get("edges", [])
+            formatted_products = []
+
+            for edge in products:
+                node = edge["node"]
+                # Extract image URL if available
+                image_url = None
+                images = node.get("images", {}).get("edges", [])
+                if images:
+                    image_url = images[0].get("node", {}).get("url")
+
+                # Create formatted product with image metadata
+                formatted_product = {
+                    **node,
+                    "primary_image_url": image_url,
+                    "has_image": bool(image_url)
+                }
+                formatted_products.append(formatted_product)
+
             return {
-                "products": [edge["node"] for edge in products],
+                "products": formatted_products,
                 "total_found": len(products),
-                "search_query": parameters.get("query", "")
+                "search_query": parameters.get("query", ""),
+                "has_images": any(p.get("has_image") for p in formatted_products)
             }
         else:
             # Direct array format from fallback
             products = data.get("products", [])
+            formatted_products = []
+
+            for product in products:
+                # Extract image URL if available
+                image_url = None
+                images = product.get("images", {}).get("edges", [])
+                if images:
+                    image_url = images[0].get("node", {}).get("url")
+
+                # Create formatted product with image metadata
+                formatted_product = {
+                    **product,
+                    "primary_image_url": image_url,
+                    "has_image": bool(image_url)
+                }
+                formatted_products.append(formatted_product)
+
             return {
-                "products": products,
+                "products": formatted_products,
                 "total_found": len(products),
-                "search_query": parameters.get("query", "")
+                "search_query": parameters.get("query", ""),
+                "has_images": any(p.get("has_image") for p in formatted_products)
             }
     
     # Format cart operations

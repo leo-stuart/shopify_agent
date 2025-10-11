@@ -85,6 +85,81 @@ def send_whatsapp_message(to: str, message: str) -> Dict[str, Any]:
         }
 
 
+def send_whatsapp_image(to: str, image_url: str, caption: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Send an image via WhatsApp Web.js bridge.
+
+    Args:
+        to: Recipient phone number (with country code, no + symbol)
+        image_url: URL of the image to send
+        caption: Optional caption for the image
+
+    Returns:
+        Dict containing success status and response details
+    """
+    bridge_url = os.getenv("WHATSAPP_BRIDGE_URL", "http://localhost:3001")
+
+    try:
+        response = requests.post(
+            f"{bridge_url}/send-image",
+            json={
+                "to": to,
+                "imageUrl": image_url,
+                "caption": caption
+            },
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"WhatsApp image sent successfully to {to}")
+
+            return {
+                "success": True,
+                "recipient": result.get("to", to),
+                "image_url": image_url,
+                "caption": caption,
+                "bridge_response": result
+            }
+        elif response.status_code == 503:
+            # WhatsApp client not ready
+            return {
+                "success": False,
+                "error": "WhatsApp client is not ready. Please scan QR code first.",
+                "recipient": to,
+                "status_code": 503
+            }
+        else:
+            error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {"error": response.text}
+            return {
+                "success": False,
+                "error": f"Bridge error: {error_data.get('error', 'Unknown error')}",
+                "recipient": to,
+                "status_code": response.status_code
+            }
+
+    except requests.exceptions.ConnectionError:
+        return {
+            "success": False,
+            "error": f"Cannot connect to WhatsApp bridge at {bridge_url}. Is the bridge server running?",
+            "recipient": to
+        }
+    except requests.exceptions.Timeout:
+        return {
+            "success": False,
+            "error": "Timeout communicating with WhatsApp bridge",
+            "recipient": to
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error sending WhatsApp image: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "recipient": to
+        }
+
+
 def get_whatsapp_client_info() -> Dict[str, Any]:
     """
     Get WhatsApp client information from the bridge.
