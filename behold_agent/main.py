@@ -239,11 +239,15 @@ def create_application() -> FastAPI:
                         except Exception as create_error:
                             logger.debug(f"Session already exists for {user_id}: {create_error}")
 
-                    # Inject context summary into the message if available
-                    enhanced_message = message
+                    # Inject user WhatsApp ID and context summary into the message
+                    # The agent needs to know the user's WhatsApp ID for sending images
+                    enhanced_message = f"[USER WHATSAPP ID: {user_id}]\n\n"
+
                     if context_summary:
                         # Prepend context to user message (invisible to user, visible to agent)
-                        enhanced_message = f"[CONTEXT FROM PREVIOUS TURNS]\n{context_summary}\n\n[CURRENT USER MESSAGE]\n{message}"
+                        enhanced_message += f"[CONTEXT FROM PREVIOUS TURNS]\n{context_summary}\n\n"
+
+                    enhanced_message += f"[CURRENT USER MESSAGE]\n{message}"
 
                     # Create user message content
                     user_message = Content(role="user", parts=[Part.from_text(text=enhanced_message)])
