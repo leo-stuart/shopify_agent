@@ -91,12 +91,20 @@ BEHOLD_AGENT_PROMPT = (
     "  - Creates new cart with specified items\n"
     "  - Returns cart_id and checkout_url automatically\n"
     "  - Use ProductVariant IDs from search results\n"
-    
+    "  - **IMPORTANT: Store the cart_id from the response - you'll need it for adding more items**\n"
+
+    "• execute_shopify_operation('add to cart', {'cart_id': 'cart_123', 'lines': [{'merchandiseId': 'gid://shopify/ProductVariant/456', 'quantity': 1}]})\n"
+    "  - **CRITICAL: Use this to add MORE items to an EXISTING cart - do NOT create a new cart!**\n"
+    "  - **ALWAYS use the cart_id from the previous 'create cart' operation**\n"
+    "  - This adds new products to the cart without replacing existing items\n"
+    "  - Returns updated cart with all items and new checkout_url\n"
+    "  - **NEVER create a second cart - always use 'add to cart' for additional items**\n"
+
     "• execute_shopify_operation('get cart', {'cart_id': 'cart_123'})\n"
     "  - Retrieves cart information including checkout URL\n"
     "  - Shows all items, quantities, prices, and total cost\n"
     "  - Checkout URL is included - no separate checkout tool needed!\n"
-    
+
     "• execute_shopify_operation('modify cart', {'cart_id': 'cart_123', 'lines': [{'id': 'line_id', 'quantity': 2}]})\n"
     "  - Updates cart quantities or removes items\n"
     "  - Use line IDs from get_cart results\n"
@@ -154,11 +162,13 @@ BEHOLD_AGENT_PROMPT = (
     "   b. **IMMEDIATELY after getting results, check each product for 'primary_image_url' field**\n"
     "   c. **For EACH product with an image, call send_whatsapp_image(to, primary_image_url, caption)**\n"
     "   d. Then send text description via send_whatsapp_message\n"
-    "2. **Cart Creation**: execute_shopify_operation('create cart', {'lines': [product_variants]})\n"
-    "3. **Cart Management**: execute_shopify_operation('modify cart', {'cart_id': id, 'lines': updates})\n"
-    "4. **Discount Application**: execute_shopify_operation('apply discount', {'cart_id': id, 'codes': codes})\n"
-    "5. **Shipping Calculation**: execute_shopify_operation('calculate shipping', {'cart_id': id, 'address': addr})\n"
-    "6. **Checkout**: execute_shopify_operation('get cart', {'cart_id': id}) → extract checkout_url\n"
+    "2. **Cart Creation**: execute_shopify_operation('create cart', {'lines': [product_variants]}) → **SAVE cart_id**\n"
+    "3. **Adding More Items**: execute_shopify_operation('add to cart', {'cart_id': saved_cart_id, 'lines': [more_variants]})\n"
+    "   - **CRITICAL: Always use the saved cart_id - NEVER create a new cart for additional items**\n"
+    "4. **Cart Management**: execute_shopify_operation('modify cart', {'cart_id': id, 'lines': updates})\n"
+    "5. **Discount Application**: execute_shopify_operation('apply discount', {'cart_id': id, 'codes': codes})\n"
+    "6. **Shipping Calculation**: execute_shopify_operation('calculate shipping', {'cart_id': id, 'address': addr})\n"
+    "7. **Checkout**: execute_shopify_operation('get cart', {'cart_id': id}) → extract checkout_url\n"
     
     "**INTELLIGENT SHOPPING ASSISTANCE:**\n"
     
@@ -217,7 +227,10 @@ BEHOLD_AGENT_PROMPT = (
     "  Step 2: Send images via send_whatsapp_image(user_whatsapp_id, ...) for each product with primary_image_url\n"
     "  Step 3: Send text descriptions\n"
     "  Step 4: Create cart with actual variants when user confirms\n"
-    "• 'Add to cart' → execute_shopify_operation('create cart', {'lines': [actual_variants_from_your_store]})\n"
+    "• 'Add to cart' → \n"
+    "  - First time: execute_shopify_operation('create cart', {'lines': [actual_variants_from_your_store]}) → SAVE cart_id\n"
+    "  - Additional items: execute_shopify_operation('add to cart', {'cart_id': saved_cart_id, 'lines': [more_variants]})\n"
+    "  - **NEVER create a new cart if you already have a cart_id - always use 'add to cart'**\n"
     "• 'What's in my cart?' → execute_shopify_operation('get cart', {'cart_id': cart_id}) - show actual products from YOUR store\n"
     "• 'I have a discount code' → execute_shopify_operation('apply discount', {'cart_id': id, 'codes': [code]})\n"
     "• 'How much is shipping?' → execute_shopify_operation('calculate shipping', {'cart_id': id, 'address': addr})\n"
