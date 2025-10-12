@@ -286,7 +286,9 @@ def create_application() -> FastAPI:
                 logger.error("Agent not available")
                 raise HTTPException(status_code=500, detail="Agent not available")
 
-            return {"reply": response_text}
+            # Note: Agent already sent messages directly to WhatsApp via send_whatsapp_message tool
+            # We return success but don't send the response again
+            return {"status": "success", "message": "Agent processed message and sent response directly"}
 
         except Exception as e:
             logger.error(f"Error processing WhatsApp message: {e}")
