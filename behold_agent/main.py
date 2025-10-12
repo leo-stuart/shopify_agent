@@ -254,11 +254,22 @@ def create_application() -> FastAPI:
 
                     # Run agent asynchronously via Runner
                     response_text = ""
+                    whatsapp_tool_used = False
+
                     async for event in runner.run_async(
                         user_id=user_id,
                         session_id=session_id,
                         new_message=user_message
                     ):
+                        # Check if WhatsApp tools were used
+                        if hasattr(event, 'content') and event.content:
+                            for part in event.content.parts:
+                                if hasattr(part, 'function_call') and part.function_call:
+                                    func_name = part.function_call.name
+                                    if func_name in ['send_whatsapp_message', 'send_whatsapp_image']:
+                                        whatsapp_tool_used = True
+                                        logger.info(f"Detected WhatsApp tool usage: {func_name}")
+
                         if event.is_final_response():
                             response_text = event.content.parts[0].text
                             break
@@ -272,11 +283,12 @@ def create_application() -> FastAPI:
                         assistant_response=response_text,
                         metadata={
                             "user": {"message_id": message_id},
-                            "assistant": {}
+                            "assistant": {"whatsapp_tool_used": whatsapp_tool_used}
                         }
                     )
 
                     logger.info(f"Agent response: {response_text}")
+                    logger.info(f"WhatsApp tools used: {whatsapp_tool_used}")
                     logger.info(f"Context updated: {len(context.conversation_history)} messages in history")
 
                 except Exception as agent_error:
@@ -286,9 +298,14 @@ def create_application() -> FastAPI:
                 logger.error("Agent not available")
                 raise HTTPException(status_code=500, detail="Agent not available")
 
-            # Note: Agent already sent messages directly to WhatsApp via send_whatsapp_message tool
-            # We return success but don't send the response again
-            return {"status": "success", "message": "Agent processed message and sent response directly"}
+            # If agent used WhatsApp tools, it already sent the message
+            # If not, return the response so the bridge can send it
+            if whatsapp_tool_used:
+                logger.info("Agent used WhatsApp tools - no need to send response again")
+                return {"status": "success", "message": "Agent sent messages directly via WhatsApp tools"}
+            else:
+                logger.info("Agent did not use WhatsApp tools - returning response for bridge to send")
+                return {"reply": response_text}
 
         except Exception as e:
             logger.error(f"Error processing WhatsApp message: {e}")
