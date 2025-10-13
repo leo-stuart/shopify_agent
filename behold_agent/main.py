@@ -10,6 +10,7 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Configure logging first
@@ -22,6 +23,18 @@ logger = logging.getLogger(__name__)
 
 # Reduce verbosity of ADK model registry logs
 logging.getLogger('google_adk.google.adk.models.registry').setLevel(logging.WARNING)
+
+# Import analytics system
+try:
+    from analytics import analytics_router, webhooks_router, db_manager
+    analytics_available = True
+    logger.info("✅ Analytics system loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Analytics system not available: {e}")
+    analytics_router = None
+    webhooks_router = None
+    db_manager = None
+    analytics_available = False
 
 # Import agent conditionally - use when available, fallback when not
 try:
@@ -89,6 +102,16 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("Starting Behold WhatsApp Shopify Agent")
+
+    # Initialize database if analytics available
+    if analytics_available and db_manager:
+        try:
+            logger.info("Creating database tables...")
+            db_manager.create_tables()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+
     yield
     logger.info("Shutting down Behold WhatsApp Shopify Agent")
 
@@ -97,14 +120,49 @@ def create_application() -> FastAPI:
     """Create FastAPI application with all components."""
     app = FastAPI(
         title="Behold WhatsApp Shopify Agent",
-        description="WhatsApp integration for Shopify store assistance using Google ADK",
-        version="1.0.0"
+        description="WhatsApp integration for Shopify store assistance using Google ADK with Business Intelligence",
+        version="0.2.0",
+        lifespan=lifespan
     )
-    
+
+    # Add CORS middleware for dashboard access
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Configure appropriately for production
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include analytics and webhook routers if available
+    if analytics_available:
+        if analytics_router:
+            app.include_router(analytics_router)
+            logger.info("✅ Analytics routes enabled")
+        if webhooks_router:
+            app.include_router(webhooks_router)
+            logger.info("✅ Webhook routes enabled")
+
     @app.get("/")
     async def root():
         """Root endpoint."""
-        return {"message": "Behold WhatsApp Shopify Agent is running"}
+        return {
+            "message": "Behold WhatsApp Shopify Agent is running",
+            "version": "0.2.0",
+            "features": [
+                "WhatsApp Sales Agent",
+                "Business Intelligence & Analytics" if analytics_available else "Business Intelligence (Not Available)",
+                "Order Attribution & Tracking" if analytics_available else "Order Attribution (Not Available)",
+                "Shopify Integration"
+            ],
+            "endpoints": {
+                "health": "/health",
+                "process_message": "/process-whatsapp-message",
+                "analytics": "/analytics/overview" if analytics_available else None,
+                "webhooks": "/webhooks/shopify/orders/create" if analytics_available else None,
+                "docs": "/docs"
+            }
+        }
     
     @app.get("/health")
     async def health_check():
@@ -316,7 +374,6 @@ def create_application() -> FastAPI:
 
 # Create the app
 app = create_application()
-app.router.lifespan_context = lifespan
 
 
 def main():
