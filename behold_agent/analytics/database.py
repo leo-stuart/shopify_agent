@@ -254,13 +254,16 @@ class DatabaseManager:
         Initialize database manager.
 
         Args:
-            database_url: SQLAlchemy database URL. If None, uses DATABASE_URL env var
-                         or defaults to SQLite in project directory.
+            database_url: SQLAlchemy database URL. If None, uses DATABASE_URL env var.
         """
         if database_url is None:
-            database_url = os.getenv(
-                "DATABASE_URL",
-                "sqlite:///./behold_analytics.db"  # Default SQLite for development
+            database_url = os.getenv("DATABASE_URL")
+
+        # Validate DATABASE_URL is provided and not empty
+        if not database_url:
+            raise ValueError(
+                "DATABASE_URL environment variable is required. "
+                "Add a PostgreSQL database to your Railway project to automatically set this variable."
             )
 
         # Handle postgres:// to postgresql:// for SQLAlchemy 1.4+
