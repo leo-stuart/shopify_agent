@@ -99,8 +99,8 @@ class Message(Base):
     content = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Message metadata
-    metadata = Column(JSON, default=dict)  # Store tool usage, response time, etc.
+    # Message metadata (renamed to avoid SQLAlchemy reserved word)
+    message_metadata = Column(JSON, default=dict)  # Store tool usage, response time, etc.
 
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
