@@ -603,7 +603,10 @@ def _fallback_operation(intent: str, parameters: Dict[str, Any], api: str) -> Di
 
     # Cart creation fallback
     elif "create" in intent_lower and "cart" in intent_lower:
-        return _execute_cart_creation(parameters.get("lines", []))
+        # Extract attribution context if provided
+        conversation_id = parameters.get("conversation_id")
+        user_id = parameters.get("user_id")
+        return _execute_cart_creation(parameters.get("lines", []), conversation_id, user_id)
 
     # Add to cart fallback (CRITICAL: Check this BEFORE "get cart" since both contain "cart")
     elif "add" in intent_lower and "cart" in intent_lower:
@@ -900,20 +903,31 @@ def _execute_product_search(query: str, first: int = 20) -> Dict[str, Any]:
     return result
 
 
-def _execute_cart_creation(lines: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Fallback cart creation with hardcoded query."""
+def _execute_cart_creation(lines: List[Dict[str, Any]], conversation_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Fallback cart creation with hardcoded query.
+
+    Args:
+        lines: Cart line items
+        conversation_id: Optional conversation ID for attribution
+        user_id: Optional user ID for attribution
+    """
     if not lines:
         return {
             "status": "error",
             "error_message": "Please provide items to add to the cart."
         }
-    
+
     graphql_query = """
     mutation cartCreate($input: CartInput!) {
         cartCreate(input: $input) {
             cart {
                 id
                 checkoutUrl
+                attributes {
+                    key
+                    value
+                }
                 lines(first: 10) {
                     edges {
                         node {
@@ -949,8 +963,20 @@ def _execute_cart_creation(lines: List[Dict[str, Any]]) -> Dict[str, Any]:
         }
     }
     """
-    
-    variables = {"input": {"lines": lines}}
+
+    # Build cart input with optional attribution
+    cart_input = {"lines": lines}
+
+    # Add attribution if conversation_id and user_id provided
+    if conversation_id and user_id:
+        cart_input["attributes"] = [
+            {"key": "_agent_conversation_id", "value": conversation_id},
+            {"key": "_agent_user_id", "value": user_id},
+            {"key": "_agent_source", "value": "behold_whatsapp_agent"},
+        ]
+        logger.info(f"Creating cart with attribution: conversation={conversation_id}, user={user_id}")
+
+    variables = {"input": cart_input}
     result = execute_shopify_graphql(graphql_query, variables, "storefront")
     
     if result["status"] == "success":
