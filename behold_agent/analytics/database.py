@@ -34,8 +34,8 @@ class User(Base):
     first_seen = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_seen = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # User metadata
-    metadata = Column(JSON, default=dict)  # Store additional user info
+    # User metadata (renamed to avoid SQLAlchemy reserved word)
+    user_metadata = Column(JSON, default=dict)  # Store additional user info
 
     # Relationships
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
