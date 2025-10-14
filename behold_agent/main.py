@@ -307,9 +307,15 @@ def create_application() -> FastAPI:
                         except Exception as create_error:
                             logger.debug(f"Session already exists for {user_id}: {create_error}")
 
-                    # Inject user WhatsApp ID and context summary into the message
+                    # Inject user WhatsApp ID, session context, and analytics IDs into the message
                     # The agent needs to know the user's WhatsApp ID for sending images
-                    enhanced_message = f"[USER WHATSAPP ID: {user_id}]\n\n"
+                    # AND the conversation_id/user_id for analytics tracking
+                    enhanced_message = f"[USER WHATSAPP ID: {user_id}]\n"
+                    enhanced_message += f"[CONVERSATION ID: {session_id}]\n"
+                    enhanced_message += f"[USER ID FOR ANALYTICS: {user_id}]\n\n"
+                    enhanced_message += "**IMPORTANT: Include these IDs in ALL Shopify operations:**\n"
+                    enhanced_message += f"- conversation_id: \"{session_id}\"\n"
+                    enhanced_message += f"- user_id: \"{user_id}\"\n\n"
 
                     if context_summary:
                         # Prepend context to user message (invisible to user, visible to agent)
