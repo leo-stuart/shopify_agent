@@ -6,7 +6,7 @@ Provides endpoints for merchant analytics and reporting.
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 
 from .analytics_service import analytics_service
 from .webhook_handler import setup_shopify_webhooks_guide
@@ -215,7 +215,7 @@ webhooks_router = APIRouter(prefix="/webhooks/shopify", tags=["Webhooks"])
 
 
 @webhooks_router.post("/orders/create")
-async def shopify_order_webhook(request):
+async def shopify_order_webhook(request: Request):
     """
     Shopify webhook endpoint for order creation.
 
@@ -227,7 +227,7 @@ async def shopify_order_webhook(request):
 
 
 @webhooks_router.post("/carts/create")
-async def shopify_cart_webhook(request):
+async def shopify_cart_webhook(request: Request):
     """
     Shopify webhook endpoint for cart creation (optional).
 
