@@ -279,6 +279,16 @@ class TrackingService:
                 items=items
             )
             session.add(cart)
+
+            # Update conversation funnel flags
+            conversation = session.query(Conversation).filter_by(id=conversation_id).first()
+            if conversation:
+                conversation.cart_created = True
+                # If checkout URL exists, mark checkout as initiated
+                if checkout_url:
+                    conversation.checkout_initiated = True
+                    logger.debug(f"Set checkout_initiated for conversation {conversation_id}")
+
             session.commit()
             logger.info(f"Recorded cart creation: {cart_id} for conversation {conversation_id}")
         except Exception as e:

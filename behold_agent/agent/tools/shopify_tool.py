@@ -21,11 +21,14 @@ _mcp_api_contexts = {}  # Track which APIs have been initialized
 # Use absolute import matching main.py's import style
 try:
     from analytics.tracking_service import tracking_service
+    from analytics.database import Conversation, db_manager
     _tracking_enabled = True
     logger.info("Analytics tracking service loaded successfully")
 except ImportError as e:
     logger.warning(f"Analytics tracking service not available: {e}")
     tracking_service = None
+    db_manager = None
+    Conversation = None
     _tracking_enabled = False
 
 
@@ -938,6 +941,21 @@ def _execute_product_search(query: str, first: int = 20, conversation_id: Option
                             recommended_by_agent=True
                         )
                 logger.info(f"Tracked {len(products)} product views for conversation {conversation_id}")
+
+                # Increment products_searched counter for funnel analytics
+                session = db_manager.get_session()
+                try:
+                    conversation = session.query(Conversation).filter_by(id=conversation_id).first()
+                    if conversation:
+                        conversation.products_searched += 1
+                        session.commit()
+                        logger.debug(f"Incremented products_searched for conversation {conversation_id}")
+                except Exception as db_error:
+                    session.rollback()
+                    logger.error(f"Failed to increment products_searched: {db_error}")
+                finally:
+                    session.close()
+
             except Exception as e:
                 logger.error(f"Failed to track product views: {e}")
 
