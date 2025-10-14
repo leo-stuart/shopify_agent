@@ -34,6 +34,11 @@ def verify_shopify_webhook(
         True if verification succeeds, False otherwise
     """
     try:
+        # Log debug information for troubleshooting
+        logger.debug(f"Webhook verification - Body length: {len(data)} bytes")
+        logger.debug(f"Webhook verification - Secret length: {len(secret)} chars")
+        logger.debug(f"Webhook verification - Received HMAC: {hmac_header}")
+
         # Shopify uses HMAC-SHA256 for webhook verification
         digest = hmac.new(
             secret.encode('utf-8'),
@@ -45,9 +50,25 @@ def verify_shopify_webhook(
         import base64
         computed_hmac = base64.b64encode(digest).decode()
 
-        return hmac.compare_digest(computed_hmac, hmac_header)
+        logger.debug(f"Webhook verification - Computed HMAC: {computed_hmac}")
+
+        # Compare HMACs
+        is_valid = hmac.compare_digest(computed_hmac, hmac_header)
+
+        if is_valid:
+            logger.info("Webhook signature verified successfully")
+        else:
+            logger.warning(
+                f"Webhook signature mismatch!\n"
+                f"  Received: {hmac_header}\n"
+                f"  Computed: {computed_hmac}\n"
+                f"  Body length: {len(data)} bytes\n"
+                f"  Secret length: {len(secret)} chars"
+            )
+
+        return is_valid
     except Exception as e:
-        logger.error(f"Error verifying webhook signature: {e}")
+        logger.error(f"Error verifying webhook signature: {e}", exc_info=True)
         return False
 
 
@@ -85,8 +106,15 @@ async def handle_order_create_webhook(
             raise HTTPException(status_code=401, detail="Missing webhook signature")
 
         if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
-            logger.warning("Invalid webhook signature - rejecting webhook")
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            logger.warning(
+                f"Invalid webhook signature - rejecting webhook. "
+                f"Check that SHOPIFY_WEBHOOK_SECRET matches the secret configured in Shopify Admin. "
+                f"Body size: {len(body)} bytes, Header: {x_shopify_hmac_sha256[:20]}..."
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook signature. Verify SHOPIFY_WEBHOOK_SECRET matches Shopify configuration."
+            )
 
         logger.info("Webhook signature verified successfully")
 
@@ -211,8 +239,15 @@ async def handle_cart_create_webhook(
             raise HTTPException(status_code=401, detail="Missing webhook signature")
 
         if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
-            logger.warning("Invalid cart webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            logger.warning(
+                f"Invalid cart webhook signature - rejecting webhook. "
+                f"Check that SHOPIFY_WEBHOOK_SECRET matches the secret configured in Shopify Admin. "
+                f"Body size: {len(body)} bytes"
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook signature. Verify SHOPIFY_WEBHOOK_SECRET matches Shopify configuration."
+            )
 
         cart_data = json.loads(body)
         logger.info(f"Received cart create webhook: {cart_data.get('id', 'unknown')}")
