@@ -19,10 +19,11 @@ _mcp_api_contexts = {}  # Track which APIs have been initialized
 
 # Import analytics tracking service
 try:
-    from behold_agent.analytics.tracking_service import tracking_service
+    from ...analytics.tracking_service import tracking_service
     _tracking_enabled = True
-except ImportError:
-    logger.warning("Analytics tracking service not available")
+    logger.info("Analytics tracking service loaded successfully")
+except ImportError as e:
+    logger.warning(f"Analytics tracking service not available: {e}")
     tracking_service = None
     _tracking_enabled = False
 
