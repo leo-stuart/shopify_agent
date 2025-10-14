@@ -18,8 +18,9 @@ _mcp_conversation_id = None
 _mcp_api_contexts = {}  # Track which APIs have been initialized
 
 # Import analytics tracking service
+# Use absolute import matching main.py's import style
 try:
-    from ...analytics.tracking_service import tracking_service
+    from analytics.tracking_service import tracking_service
     _tracking_enabled = True
     logger.info("Analytics tracking service loaded successfully")
 except ImportError as e:
