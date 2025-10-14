@@ -57,15 +57,15 @@ class TrackingService:
                 user = User(
                     id=user_id,
                     phone_number=phone_number,
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow()
+                    first_seen=datetime.now(),
+                    last_seen=datetime.now()
                 )
                 session.add(user)
                 session.commit()
                 logger.info(f"Created new user: {user_id}")
             else:
                 # Update last_seen
-                user.last_seen = datetime.utcnow()
+                user.last_seen = datetime.now()
                 session.commit()
 
             return user
@@ -103,8 +103,8 @@ class TrackingService:
                 conversation = Conversation(
                     id=conversation_id,
                     user_id=user_id,
-                    started_at=datetime.utcnow(),
-                    last_activity=datetime.utcnow()
+                    started_at=datetime.now(),
+                    last_activity=datetime.now()
                 )
                 session.add(conversation)
                 session.commit()
@@ -140,8 +140,8 @@ class TrackingService:
                 conversation_id=conversation_id,
                 role=role,
                 content=content,
-                timestamp=datetime.utcnow(),
-                metadata=metadata or {}
+                timestamp=datetime.now(),
+                message_metadata=metadata or {}
             )
             session.add(message)
 
@@ -152,7 +152,7 @@ class TrackingService:
                     conversation.message_count += 1
                 elif role == "assistant":
                     conversation.agent_response_count += 1
-                conversation.last_activity = datetime.utcnow()
+                conversation.last_activity = datetime.now()
 
             session.commit()
             logger.debug(f"Recorded {role} message in conversation {conversation_id}")
@@ -173,7 +173,7 @@ class TrackingService:
         try:
             conversation = session.query(Conversation).filter_by(id=conversation_id).first()
             if conversation:
-                conversation.ended_at = datetime.utcnow()
+                conversation.ended_at = datetime.now()
                 duration = (conversation.ended_at - conversation.started_at).total_seconds()
                 conversation.total_duration_seconds = int(duration)
                 session.commit()
@@ -215,7 +215,7 @@ class TrackingService:
             action = AgentAction(
                 conversation_id=conversation_id,
                 action_type=action_type,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(),
                 parameters=parameters,
                 result=result,
                 success=success,
@@ -271,7 +271,7 @@ class TrackingService:
             cart = Cart(
                 id=cart_id,
                 conversation_id=conversation_id,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(),
                 checkout_url=checkout_url,
                 total_items=len(items),
                 subtotal_amount=subtotal_amount,
@@ -308,7 +308,7 @@ class TrackingService:
                 cart.items = items
                 cart.total_items = len(items)
                 cart.subtotal_amount = subtotal_amount
-                cart.updated_at = datetime.utcnow()
+                cart.updated_at = datetime.now()
                 session.commit()
                 logger.debug(f"Updated cart: {cart_id}")
         except Exception as e:
@@ -360,7 +360,7 @@ class TrackingService:
                 conversation_id=conversation_id,
                 user_id=user_id,
                 cart_id=cart_id,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(),
                 order_number=order_number,
                 total_amount=total_amount,
                 subtotal_amount=subtotal_amount,
@@ -427,7 +427,7 @@ class TrackingService:
                 product_title=product_title,
                 product_price=product_price,
                 product_type=product_type,
-                viewed_at=datetime.utcnow(),
+                viewed_at=datetime.now(),
                 recommended_by_agent=recommended_by_agent
             )
             session.add(product_view)

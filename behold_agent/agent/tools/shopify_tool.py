@@ -978,7 +978,7 @@ def _execute_cart_creation(lines: List[Dict[str, Any]], conversation_id: Optiona
 
     variables = {"input": cart_input}
     result = execute_shopify_graphql(graphql_query, variables, "storefront")
-    
+
     if result["status"] == "success":
         cart_data = result["data"].get("cartCreate", {})
         if cart_data.get("userErrors"):
@@ -986,14 +986,51 @@ def _execute_cart_creation(lines: List[Dict[str, Any]], conversation_id: Optiona
                 "status": "error",
                 "error_message": f"Cart creation failed: {cart_data['userErrors'][0].get('message')}"
             }
-        
+
         cart = cart_data.get("cart", {})
+        cart_id = cart.get("id")
+        checkout_url = cart.get("checkoutUrl")
+        cart_lines = cart.get("lines", {}).get("edges", [])
+        cost = cart.get("cost", {})
+
+        # Track cart in database if conversation_id provided
+        if conversation_id and cart_id:
+            try:
+                from analytics import tracking_service
+                if tracking_service:
+                    # Extract cart items for tracking
+                    items = []
+                    for edge in cart_lines:
+                        node = edge.get("node", {})
+                        merchandise = node.get("merchandise", {})
+                        items.append({
+                            "product_id": merchandise.get("product", {}).get("id"),
+                            "variant_id": merchandise.get("id"),
+                            "quantity": node.get("quantity"),
+                            "title": merchandise.get("product", {}).get("title")
+                        })
+
+                    total_amount = float(cost.get("totalAmount", {}).get("amount", 0))
+                    currency = cost.get("totalAmount", {}).get("currencyCode", "USD")
+
+                    tracking_service.record_cart_creation(
+                        cart_id=cart_id,
+                        conversation_id=conversation_id,
+                        checkout_url=checkout_url,
+                        items=items,
+                        subtotal_amount=total_amount,
+                        currency=currency
+                    )
+                    logger.info(f"Cart tracked in database: {cart_id}")
+            except Exception as e:
+                logger.error(f"Failed to track cart in database: {e}")
+
         return {
             "status": "success",
-            "cart_id": cart.get("id"),
-            "checkout_url": cart.get("checkoutUrl"),
-            "total_quantity": len(cart.get("lines", {}).get("edges", [])),
-            "cost": cart.get("cost", {})
+            "cart_id": cart_id,
+            "checkout_url": checkout_url,
+            "total_quantity": len(cart_lines),
+            "cost": cost
         }
     
     return result
