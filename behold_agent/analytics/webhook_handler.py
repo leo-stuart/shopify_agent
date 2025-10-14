@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 from typing import Dict, Any, Optional
-from fastapi import Request, HTTPException, Header
+from fastapi import Request, HTTPException
 import os
 
 from .tracking_service import tracking_service
@@ -52,9 +52,7 @@ def verify_shopify_webhook(
 
 
 async def handle_order_create_webhook(
-    request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None),
-    x_shopify_topic: Optional[str] = Header(None)
+    request: Request
 ) -> Dict[str, Any]:
     """
     Handle Shopify orders/create webhook.
@@ -64,8 +62,6 @@ async def handle_order_create_webhook(
 
     Args:
         request: FastAPI request object
-        x_shopify_hmac_sha256: Shopify HMAC signature header
-        x_shopify_topic: Shopify webhook topic
 
     Returns:
         Response dict
@@ -74,14 +70,25 @@ async def handle_order_create_webhook(
         # Get raw body for HMAC verification
         body = await request.body()
 
-        # Verify webhook authenticity
+        # Extract headers directly from request
+        x_shopify_hmac_sha256 = request.headers.get("x-shopify-hmac-sha256")
+        x_shopify_topic = request.headers.get("x-shopify-topic")
+
+        # Verify webhook authenticity - REQUIRED for security
         webhook_secret = os.getenv("SHOPIFY_WEBHOOK_SECRET")
-        if webhook_secret and x_shopify_hmac_sha256:
-            if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
-                logger.warning("Invalid webhook signature")
-                raise HTTPException(status_code=401, detail="Invalid webhook signature")
-        else:
-            logger.warning("Webhook secret not configured - skipping verification")
+        if not webhook_secret:
+            logger.error("SHOPIFY_WEBHOOK_SECRET not configured - webhook verification required!")
+            raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+        if not x_shopify_hmac_sha256:
+            logger.warning("No HMAC signature in webhook request")
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+        if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
+            logger.warning("Invalid webhook signature - rejecting webhook")
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+        logger.info("Webhook signature verified successfully")
 
         # Parse order data
         order_data = json.loads(body)
@@ -173,8 +180,7 @@ async def handle_order_create_webhook(
 
 
 async def handle_cart_create_webhook(
-    request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    request: Request
 ) -> Dict[str, Any]:
     """
     Handle Shopify carts/create webhook (if enabled).
@@ -184,7 +190,6 @@ async def handle_cart_create_webhook(
 
     Args:
         request: FastAPI request object
-        x_shopify_hmac_sha256: Shopify HMAC signature header
 
     Returns:
         Response dict
@@ -192,11 +197,22 @@ async def handle_cart_create_webhook(
     try:
         body = await request.body()
 
-        # Verify webhook
+        # Extract headers directly from request
+        x_shopify_hmac_sha256 = request.headers.get("x-shopify-hmac-sha256")
+
+        # Verify webhook authenticity - REQUIRED for security
         webhook_secret = os.getenv("SHOPIFY_WEBHOOK_SECRET")
-        if webhook_secret and x_shopify_hmac_sha256:
-            if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
-                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        if not webhook_secret:
+            logger.error("SHOPIFY_WEBHOOK_SECRET not configured - webhook verification required!")
+            raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+        if not x_shopify_hmac_sha256:
+            logger.warning("No HMAC signature in cart webhook request")
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+        if not verify_shopify_webhook(body, x_shopify_hmac_sha256, webhook_secret):
+            logger.warning("Invalid cart webhook signature")
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
         cart_data = json.loads(body)
         logger.info(f"Received cart create webhook: {cart_data.get('id', 'unknown')}")
